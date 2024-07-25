@@ -12,17 +12,56 @@
 
 """
 import csv
+import math
 from datetime import datetime
 
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy
+
 import EGCustomPlots as EGplt
+import EyeMatchUtils as EGutil
 
 
 class DJIDronePath:
     # Constructor
-    def __init__(self):
-        self.drone_type = 'DJI Mini 3 Pro'
+    def __init__(self, drone_file, interp='Akima', tstep= 0.2, drone_type='DJI Mini 3 Pro', lowpass=False):
+        self.drone_type = drone_type
+        self.drone_file = drone_file
+        #
+        # Read raw data from drone file
+        #
+        [self.start_time, self.takeoff_lat, self.takeoff_long, sidx, snum,
+                timee, timed, alt, latit, longit] = read_dji_file(self.drone_file)
+        #
+        # Remove samples with duplicate positions
+        #
+        [sidxr, snumr, timeer, altr, latitr, longitr] = rem_duplicates([sidx, snum, timee, alt, latit, longit])
+        #
+        # Interpolate flight path to fixed time step, tstep
+        #
+        if not interp == 'None':
+            npts = math.floor((timeer[-1] - timeer[0]) / tstep) + 1
+            self.t_interp = np.linspace(timeer[0], timeer[0] + (npts - 1) * tstep, npts)
+            self.altitude = EGutil.interp_1d_array(self.t_interp, timeer, altr, interp)
+            self.latitude = EGutil.interp_1d_array(self.t_interp, timeer, latitr, interp)
+            self.longitude = EGutil.interp_1d_array(self.t_interp, timeer, longitr, interp)
+        else:
+            self.t_interp = timeer
+            self.altitude = altr
+            self.latitude = latitr
+            self.longitude = longitr
+        #
+        # Lowpass filter. Use Savitzky-Golay filter of order sg_ord and window length = sg_len.
+        # Skip lowpass filtering if interpolation was skipped.
+        #
+        if (not interp == 'None') and lowpass:
+            sg_ord = 0
+            sg_len = 5
+            self.altitude = scipy.signal.savgol_filter(self.altitude, sg_len, sg_ord)
+            self.latitude = scipy.signal.savgol_filter(self.latitude, sg_len, sg_ord)
+            self.longitude = scipy.signal.savgol_filter(self.longitude, sg_len, sg_ord)
+
 
 
 def read_dji_file(filename):
@@ -140,40 +179,25 @@ def main():
                 '\\DJI Drones\\Saved Data\\072324\\')
     filename = 'randx_patt_07232024_102440.csv'
     print(f'Drone flight path file: {filepath}{filename}')
-    [start_time, takeoff_lat, takeoff_long, samp_index, segment_num,
-        time_elapsed, time_dateobj, altitude, delta_lat, delta_long] = read_dji_file(filepath + filename)
-    print(f'\tTest Date: {start_time.strftime('%m/%d/%Y')}\tTime: {start_time.strftime('%H:%M:%S')}')
-    print(f'\tTotal sample points = {samp_index.size}')
 
-    [samp_index_red, segment_num_red, time_elapsed_red, altitude_red, delta_lat_red, delta_long_red] \
-        = rem_duplicates([samp_index, segment_num, time_elapsed, altitude, delta_lat, delta_long])
+    flight1 = DJIDronePath(filepath + filename, 'Linear', 0.2, lowpass=False)
+
+    # [start_time, takeoff_lat, takeoff_long, samp_index, segment_num,
+    #     time_elapsed, time_dateobj, altitude, delta_lat, delta_long] = read_dji_file(filepath + filename)
+    # print(f'\tTest Date: {start_time.strftime('%m/%d/%Y')}\tTime: {start_time.strftime('%H:%M:%S')}')
+    # print(f'\tTotal sample points = {samp_index.size}')
+    #
+    # [samp_index_red, segment_num_red, time_elapsed_red, altitude_red, delta_lat_red, delta_long_red] \
+    #     = rem_duplicates([samp_index, segment_num, time_elapsed, altitude, delta_lat, delta_long])
 
     #
-    # Plot delta_lat and delta_long vs. time
+    # Plot latitude and longitude vs. time
     #
-    fig1, (axes1a, axes1b) = plt.subplots(2, 1)
+    fig1, axes1 = plt.subplots()
     param_dict = {'title': 'Latitude and Longitude vs. Time', 'xlabel': 't (s)', 'ylabel': 'delta(Latitude), delta(Longitude) (m)', 'legends': ['Latitude', 'Longitude']}
-    EGplt.plot_multiline(axes1a,[delta_lat, delta_long],
-                         [time_elapsed, time_elapsed], param_dict)
-    axes1a.grid(visible=True, which='both', axis='both')
-    param_dict = {'title': 'Segment Number vs. Time', 'xlabel': 't (s)',
-                  'ylabel': 'Segment Number', 'legends': ['Segment Number']}
-    EGplt.plot_multiline(axes1b, [segment_num], [time_elapsed], param_dict)
-    axes1b.grid(visible=True, which='both', axis='both')
-
-    #
-    # Plot delta_lat and delta_long vs. time after removing duplicates
-    #
-    fig2, (axes2a, axes2b) = plt.subplots(2, 1)
-    param_dict = {'title': 'Latitude and Longitude vs. Time', 'xlabel': 't (s)',
-                  'ylabel': 'delta(Latitude), delta(Longitude) (m)', 'legends': ['Latitude', 'Longitude']}
-    EGplt.plot_multiline(axes2a, [delta_lat_red, delta_long_red],
-                         [time_elapsed_red, time_elapsed_red], param_dict)
-    axes2a.grid(visible=True, which='both', axis='both')
-    param_dict = {'title': 'Segment Number vs. Time', 'xlabel': 't (s)',
-                  'ylabel': 'Segment Number', 'legends': ['Segment Number']}
-    EGplt.plot_multiline(axes2b, [segment_num_red], [time_elapsed_red], param_dict)
-    axes2b.grid(visible=True, which='both', axis='both')
+    EGplt.plot_multiline(axes1,[flight1.latitude, flight1.longitude],
+                         [flight1.t_interp, flight1.t_interp], param_dict)
+    axes1.grid(visible=True, which='both', axis='both')
 
     plt.show()
 
