@@ -1,7 +1,7 @@
 """
-    DJIDronePath -- Class that defines an object that contains a sampled
-            DJI drone flight path time series, and methods to pre-process and
-            clean the data prior.
+    DJIDronePath -- Class that contains a sampled DJI drone flight path time series,
+            and methods to pre-process and clean the data in preparation for pairing with
+            eye-gaze time series.
 
     Description ...
 
@@ -35,33 +35,55 @@ class DJIDronePath:
                 timee, timed, alt, latit, longit] = read_dji_file(self.drone_file)
         #
         # Remove samples with duplicate positions
-        #
         [sidxr, snumr, timeer, altr, latitr, longitr] = rem_duplicates([sidx, snum, timee, alt, latit, longit])
         #
-        # Interpolate flight path to fixed time step, tstep
+        # Rotate longitutde and latitude axes to form X and Z axes relative to drone perspective.
+        self.dji_convtoxyz(snumr, timeer, latitr, longitr, altr)
         #
+        # Interpolate, and optionally lowpass filter, flight path to fixed time step, tstep
+        # [self.t_interp, self.x, self.y, self.z] = xyz_interp_and_filt(timeer, self.x, self.y, self.z,
+        #                                                               interp=interp, lowpass=False)
+        npts = math.floor((timeer[-1] - timeer[0]) / tstep) + 1
+        self.t_interp = np.linspace(timeer[0], timeer[0] + (npts - 1) * tstep, npts) if (not interp == 'None') else timeer
         if not interp == 'None':
-            npts = math.floor((timeer[-1] - timeer[0]) / tstep) + 1
-            self.t_interp = np.linspace(timeer[0], timeer[0] + (npts - 1) * tstep, npts)
-            self.altitude = EGutil.interp_1d_array(self.t_interp, timeer, altr, interp)
-            self.latitude = EGutil.interp_1d_array(self.t_interp, timeer, latitr, interp)
-            self.longitude = EGutil.interp_1d_array(self.t_interp, timeer, longitr, interp)
-        else:
-            self.t_interp = timeer
-            self.altitude = altr
-            self.latitude = latitr
-            self.longitude = longitr
-        #
-        # Lowpass filter. Use Savitzky-Golay filter of order sg_ord and window length = sg_len.
-        # Skip lowpass filtering if interpolation was skipped.
-        #
+            self.x = EGutil.interp_1d_array(self.t_interp, timeer, self.x, interp)
+            self.y = EGutil.interp_1d_array(self.t_interp, timeer, self.y, interp)
+            self.z = EGutil.interp_1d_array(self.t_interp, timeer, self.z, interp)
         if (not interp == 'None') and lowpass:
-            sg_ord = 0
-            sg_len = 5
-            self.altitude = scipy.signal.savgol_filter(self.altitude, sg_len, sg_ord)
-            self.latitude = scipy.signal.savgol_filter(self.latitude, sg_len, sg_ord)
-            self.longitude = scipy.signal.savgol_filter(self.longitude, sg_len, sg_ord)
+            self.x = scipy.signal.savgol_filter(self.x, 5, 0)
+            self.y = scipy.signal.savgol_filter(self.y, 5, 0)
+            self.z = scipy.signal.savgol_filter(self.z, 5, 0)
 
+    def dji_convtoxyz(self, snum, timeer, latitr, longitr, altr):
+        """
+        dji_convToXYZ -- Method to convert the latitude, longitude, and altitude coordinates of a DJI drone into
+                X, Y, and Z coordinates, where +Z points in the forward direction from the front of the drone,
+                and +X points toward the right. +Y points upward.
+        """
+        #
+        # Find indices corresponding to endpoints of flight segments 1, 2, and 3 -- the segments
+        # which we know consist only of movement in the +/- x directions.
+        # Calculate angle formed by longitude / latitude in each segment, and average the three
+        # to obtain the estimated angle of rotation.
+        theta = 0.0
+        for seg in [1, 2, 3]:
+            seg_start = int(np.where(snum == seg)[0][0])
+            seg_end = int(np.where( snum == seg)[0][-1])
+            # Segments 1 and 3 go in -x direction; segment 2 in positive x
+            delta_longit = ((-1) ** seg) * (longitr[seg_end] - longitr[seg_start])
+            delta_latit = ((-1) ** seg) * (latitr[seg_end] - latitr[seg_start])
+            theta_seg = math.atan2(delta_latit, delta_longit)
+            if theta_seg < -0.75 * math.pi:
+                theta_seg += 2.0 * math.pi # If angle is close to -pi, then add 2*pi
+            theta += theta_seg
+        theta /= 3
+        print(f'Angle of rotation = {180 / math.pi * theta} degrees')
+        #
+        # Create X and Z time series from longitude and latitude. Create Y time series directly
+        # from altitude.
+        self.x = math.cos(theta) * longitr + math.sin(theta) * latitr
+        self.z = math.cos(theta) * latitr - math.sin(theta) * longitr
+        self.y = altr
 
 
 def read_dji_file(filename):
@@ -175,27 +197,19 @@ def rem_duplicates(time_series):
 
 
 def main():
-    filepath = ('C:\\Users\\abelc\\OneDrive\\Cleveland State\\Thesis Research'
-                '\\DJI Drones\\Saved Data\\072324\\')
-    filename = 'randx_patt_07232024_102440.csv'
+    filepath = ('C:\\Users\\abelc\\OneDrive\\Cleveland State\\Thesis Research\\Data Sets'
+                '\\DJI Drone\\Drone Flight Path\\072324\\')
+    filename = 'randx_patt_07232024_192433.csv'
     print(f'Drone flight path file: {filepath}{filename}')
 
-    flight1 = DJIDronePath(filepath + filename, 'Linear', 0.2, lowpass=False)
-
-    # [start_time, takeoff_lat, takeoff_long, samp_index, segment_num,
-    #     time_elapsed, time_dateobj, altitude, delta_lat, delta_long] = read_dji_file(filepath + filename)
-    # print(f'\tTest Date: {start_time.strftime('%m/%d/%Y')}\tTime: {start_time.strftime('%H:%M:%S')}')
-    # print(f'\tTotal sample points = {samp_index.size}')
-    #
-    # [samp_index_red, segment_num_red, time_elapsed_red, altitude_red, delta_lat_red, delta_long_red] \
-    #     = rem_duplicates([samp_index, segment_num, time_elapsed, altitude, delta_lat, delta_long])
+    flight1 = DJIDronePath(filepath + filename, 'Akima', 0.2, lowpass=False)
 
     #
-    # Plot latitude and longitude vs. time
+    # Plot X, Y vs. time
     #
     fig1, axes1 = plt.subplots()
-    param_dict = {'title': 'Latitude and Longitude vs. Time', 'xlabel': 't (s)', 'ylabel': 'delta(Latitude), delta(Longitude) (m)', 'legends': ['Latitude', 'Longitude']}
-    EGplt.plot_multiline(axes1,[flight1.latitude, flight1.longitude],
+    param_dict = {'title': 'X and Z vs. Time', 'xlabel': 't (s)', 'ylabel': 'X (m), Z (m)', 'legends': ['X', 'Z']}
+    EGplt.plot_multiline(axes1, [flight1.x, flight1.z],
                          [flight1.t_interp, flight1.t_interp], param_dict)
     axes1.grid(visible=True, which='both', axis='both')
 
