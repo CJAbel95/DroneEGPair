@@ -65,7 +65,7 @@ class DJIDronePath:
         # which we know consist only of movement in the +/- x directions.
         # Calculate angle formed by longitude / latitude in each segment, and average the three
         # to obtain the estimated angle of rotation.
-        theta = 0.0
+        self.theta = 0.0
         for seg in [1, 2, 3]:
             seg_start = int(np.where(snum == seg)[0][0])
             seg_end = int(np.where( snum == seg)[0][-1])
@@ -75,14 +75,14 @@ class DJIDronePath:
             theta_seg = math.atan2(delta_latit, delta_longit)
             if theta_seg < -0.75 * math.pi:
                 theta_seg += 2.0 * math.pi # If angle is close to -pi, then add 2*pi
-            theta += theta_seg
-        theta /= 3
-        print(f'Angle of rotation = {180 / math.pi * theta} degrees')
+            self.theta += theta_seg
+        self.theta /= 3
+        # print(f'Angle of rotation = {180 / math.pi * theta} degrees')
         #
         # Create X and Z time series from longitude and latitude. Create Y time series directly
         # from altitude.
-        self.x = math.cos(theta) * longitr + math.sin(theta) * latitr
-        self.z = math.cos(theta) * latitr - math.sin(theta) * longitr
+        self.x = math.cos(self.theta) * longitr + math.sin(self.theta) * latitr
+        self.z = math.cos(self.theta) * latitr - math.sin(self.theta) * longitr
         self.y = altr
 
 
@@ -203,6 +203,20 @@ def main():
     print(f'Drone flight path file: {filepath}{filename}')
 
     flight1 = DJIDronePath(filepath + filename, 'Akima', 0.2, lowpass=False)
+
+    #
+    # Read in data file separately in order to plot latitude and longitude vs. time
+    #
+    [start_time, takeoff_lat, takeoff_long, sidx, snum,
+     timee, timed, alt, latit, longit] = read_dji_file(filepath + filename)
+    [sidxr, snumr, timeer, altr, latitr, longitr] = rem_duplicates([sidx, snum, timee, alt, latit, longit])
+    fig0, (axes0a, axes0b) = plt.subplots(2, 1)
+    param_dict = {'title': 'Latitude vs. Time', 'xlabel': 't (s)', 'ylabel': 'Delta(Latitude) (m)', 'legends': ['Latitude']}
+    EGplt.plot_multiline(axes0a, [latitr], [timeer], param_dict)
+    axes0a.grid(visible=True, which='both', axis='both')
+    param_dict = {'title': 'Longitude vs. Time', 'xlabel': 't (s)', 'ylabel': 'Delta(Longitude) (m)', 'legends': ['Longitude']}
+    EGplt.plot_multiline(axes0b, [longitr], [timeer], param_dict)
+    axes0b.grid(visible=True, which='both', axis='both')
 
     #
     # Plot X, Y vs. time

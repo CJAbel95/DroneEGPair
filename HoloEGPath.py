@@ -104,10 +104,10 @@ def read_eg_file(eg_file, chop_start=0.0, chop_end=1000.0):
     # the array of time values, in seconds, from this datetime -- eg_time.
     #
     eg_start_time = date_time[start]
-    eg_time = np.array(t[start:end], dtype=np.float32) - float(t[start])
-    eg_hitpoint = np.array(hitpoint[start:end], dtype=np.float32)
-    eg_direction = np.array(direction[start:end], dtype=np.float32)
-    eg_origin = np.array(origin[start:end], dtype=np.float32)
+    eg_time = np.array(t[start:end], dtype=np.float64) - float(t[start])
+    eg_hitpoint = np.array(hitpoint[start:end], dtype=np.float64)
+    eg_direction = np.array(direction[start:end], dtype=np.float64)
+    eg_origin = np.array(origin[start:end], dtype=np.float64)
     return [eg_date, eg_start_time, eg_time, eg_hitpoint, eg_direction, eg_origin]
 
 

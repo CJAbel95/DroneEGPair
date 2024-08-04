@@ -37,8 +37,9 @@ def main():
     sorted_list = sorted(rand_list)
     nval = len(sorted_list)
     print('5% point = {0:.5f}\t95% point = {1:.5f}'.format(sorted_list[int(0.05*nval)], sorted_list[int(0.95*nval)]))
-    #rand_list_cdf = sp.stats.ecdf(rand_list).cdf
-    #print(rand_list_cdf[0])
+    # rand_list_cdf = sp.stats.ecdf(rand_list).cdf
+    # print(rand_list_cdf[0])
+
 
 # Main code
 if __name__ == '__main__':

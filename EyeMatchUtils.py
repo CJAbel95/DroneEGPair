@@ -11,6 +11,7 @@
 # 04/14/2024 -- Addded rem_duplicates() function.
 # 04/15/2024 -- Added rem_outliers() function and entropy_calc() function.
 # 04/22/2024 -- Added pos_shift_comp() and partition_calc() functions.
+# 07/29/2024 -- Added calc_vel() function.
 #
 # -------------------------------------------------
 import math
@@ -240,6 +241,21 @@ def partition_calc(x, nbits):
     return thresholds
 
 
+def key_bit_comp(key1, key2):
+    bit_count = min(len(key1), len(key2))
+    bit_diff_count = 0
+    ones_count_k1 = 0
+    ones_count_k2 = 0
+    for bit in range(0, bit_count):
+        if (key1[bit] != key2[bit]):
+            bit_diff_count += 1
+        if key1[bit] == '1':
+            ones_count_k1 += 1
+        if key2[bit] == '1':
+            ones_count_k2 += 1
+    return [bit_count, bit_diff_count, ones_count_k1, ones_count_k2]
+
+
 def entropy_calc(ones_count, bits_count):
     """
     Approximates information entropy in a bit string using Shannon's formula.
@@ -253,6 +269,87 @@ def entropy_calc(ones_count, bits_count):
     prob1 = ones_count / bits_count
     prob0 = 1.0 - prob1
     return -(prob1 * math.log2(prob1) + prob0 * math.log2(prob0)) * bits_count
+
+
+def calc_vel(time_arr, pos_arr, avg_samples=1):
+    """
+    calc_vel(): Calculate the velocity time series corresponding to a position time series.
+
+    :param time_arr: A 1D numpy array of time values.
+    :param pos_arr:  A 1D numpy array of position values.
+    :param avg_samples: Number of samples in weighted average used to calculate velocity.
+    :return: 2D numpy array with columns (time, dX/dt).
+    """
+    deriv = []
+    for i in range(avg_samples, len(time_arr)):
+        delta_x = pos_arr[i] - pos_arr[i - avg_samples]
+        delta_t = time_arr[i] - time_arr[i - avg_samples]
+        if delta_t > 0:
+            deriv.append([time_arr[i], delta_x / delta_t])
+    return np.array(deriv)
+
+
+def normalize_path(pos_arr, pos_center, pkpk_range):
+    #
+    # Subtract center value of position array and multiply by scale factor
+    #
+    return 2.0 / pkpk_range * (pos_arr - pos_center)
+
+
+def calc_norm_factor(time_arr, pos_arr, t_start, t_end, alpha=0.02):
+    #
+    # Calculate normalization factor, which can be used to scale a time series.
+    #
+    #
+    # Find indices in time_arr corresponding to t_start and t_end
+    #
+    i_start = np.argwhere(time_arr >= t_start)[0][0]
+    i_end = np.argwhere(time_arr <= t_end)[-1][0]
+    #
+    # Find alpha (lower) and 1 - alpha (upper) limits of pos_ar[i_start : i_end + 1].
+    #
+    # Note that if alpha is close to 0, then simply return the maximum and minimum values
+    # of the array.
+    #
+    if alpha > 1.0e-6:
+        pos_sorted = sorted(pos_arr[i_start: i_end + 1])
+        pos_lower = pos_sorted[int(alpha * len(pos_sorted))]
+        pos_upper = pos_sorted[len(pos_sorted) - int(alpha * len(pos_sorted))]
+    else:
+        pos_lower = np.min(pos_arr[i_start : i_end + 1])
+        pos_upper = np.max(pos_arr[i_start : i_end + 1])
+    #
+    # Return scale factor
+    return pos_upper - pos_lower
+
+
+def calc_seg_disp(time_arr, pos_arr, t_start, t_end, delta_t, disp_abs_val=True):
+    #
+    # Find starting and ending indices corresponding to time_arr = t_start
+    # and time_arr = t_end
+    #
+    index_st = np.argwhere(time_arr >= t_start)[0][0]
+    index_end = np.argwhere(time_arr <= t_end)[-1][0]
+    # Calculate number of segments
+    num_segs = math.floor((t_end - t_start) / delta_t)
+    #
+    # Split pos_arr time series into num_segs segments
+    #
+    segments = []
+    seg_indices = []
+    t_seg_start = t_start
+    for i in range(0, num_segs):
+        t_seg_end = t_seg_start + delta_t
+        seg_index_st = np.argwhere(time_arr >= t_seg_start)[0][0]
+        seg_index_end = np.argwhere(time_arr <= t_seg_end)[-1][0]
+        seg_indices.append([seg_index_st, seg_index_end])
+        if disp_abs_val:
+            segments.append(math.fabs(pos_arr[seg_index_end] - pos_arr[seg_index_st]))
+        else:
+            segments.append(pos_arr[seg_index_end] - pos_arr[seg_index_st])
+        t_seg_start = t_seg_end
+    # Return lists of segment indicies and segment displacements
+    return [segments, seg_indices]
 
 
 def main():
