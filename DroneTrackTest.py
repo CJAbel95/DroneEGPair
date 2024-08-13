@@ -281,8 +281,8 @@ class DroneTrackTest:
         return math.sqrt(mse)
 
 def main():
-    #file_path = "C:\\Users\\abelc\\OneDrive\\Cleveland State\\Thesis Research\\Hololens\\Matlab Code\\Selected_Data\\"
-    file_path = "D:\\OneDrive\\Cleveland State\\Thesis Research\\Hololens\\Matlab Code\\Selected_Data\\"
+    file_path = "C:\\Users\\abelc\\OneDrive\\Cleveland State\\Thesis Research\\Hololens\\Matlab Code\\Selected_Data\\"
+    # file_path = "D:\\OneDrive\\Cleveland State\\Thesis Research\\Hololens\\Matlab Code\\Selected_Data\\"
     #data_files = [["drone1_parameters_02042024_z10_y1p5.csv", "eye_tracker_02042024_z10_y1p5.csv"]]
     data_files = [["drone1_parameters_02052024_z3_y1p5.csv", "eye_tracker_02052024_z3_y1p5.csv"]]
     drone_test1 = DroneTrackTest(file_path + data_files[0][0], file_path + data_files[0][1])

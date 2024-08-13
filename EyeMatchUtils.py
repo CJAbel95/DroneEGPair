@@ -12,6 +12,8 @@
 # 04/15/2024 -- Added rem_outliers() function and entropy_calc() function.
 # 04/22/2024 -- Added pos_shift_comp() and partition_calc() functions.
 # 07/29/2024 -- Added calc_vel() function.
+# 08/07/2024 -- Added key_stats() function.
+# 08/13/2024 -- Added calc_norm_factor2() and calc_error_wvf() functions.
 #
 # -------------------------------------------------
 import math
@@ -297,9 +299,26 @@ def normalize_path(pos_arr, pos_center, pkpk_range):
 
 
 def calc_norm_factor(time_arr, pos_arr, t_start, t_end, alpha=0.02):
-    #
-    # Calculate normalization factor, which can be used to scale a time series.
-    #
+    """
+    Calculate normalization factor, which can be used to scale a time series.
+    The normalization factor is equal to the difference between the max - min
+    of the time series over the time range [t_start, t_end].
+    After subtracting the average value and dividing by this factor, the time series
+    values will span the range [-0.5, 0.5].
+
+    The function includes a parameter alpha, which represents the outlier
+    parameter.  If alpha > 0.000001, then max = LUB of (1 - alpha) fraction
+    of the time series, and min = GLB of alpha fraction of the time series.
+    For example, if alpha = 0.02 (default), then max = 98% of time series, and
+    min = 2% of time series.
+
+    :param time_arr: Numpy 1D array of time points in time series.
+    :param pos_arr: Numpy 1D array of dependent values of time series.
+    :param t_start: Start of time range over which max - min is calculated -- [t_start, t_end]
+    :param t_end: End of time range over which max - min is calculated
+    :param alpha: Fractional value representing outliers. Range [0, 0.5).
+    :return: max - min of time series.
+    """
     #
     # Find indices in time_arr corresponding to t_start and t_end
     #
@@ -321,6 +340,81 @@ def calc_norm_factor(time_arr, pos_arr, t_start, t_end, alpha=0.02):
     #
     # Return scale factor
     return pos_upper - pos_lower
+
+
+def calc_norm_factor2(time1_arr, x1_arr, time2_arr, x2_arr, t_start, t_end, alpha=0.02):
+    """
+    Calculate the slope (m) and intercept (b) of the linear mapping between the x1 time series
+    values and the x2 time series.  That is,
+
+    x1 = m * x2 + b
+
+    m and b are determined from the extrema (max and min) of the two arrays.  In other words,
+    max(x1) = m * max(x2) + b and min(x1) = m * min(x2) + b.
+
+    The function includes a factor alpha that sets the extrema slightly inside the true max
+    and min limits, in order to eliminate outliers.  With alpha > 0,
+        max(x) >= (1 - alpha)% of values in the x array.
+        min(x) >= alpha% of values in the x array.
+
+    :param time1_arr:
+    :param x1_arr:
+    :param time2_arr:
+    :param x2_arr:
+    :param t_start
+    :param t_end
+    :param alpha:
+    :return:
+    """
+    # Find indices in time_arr corresponding to t_start and t_end
+    i1_start = np.argwhere(time1_arr >= t_start)[0][0]
+    i1_end = np.argwhere(time1_arr <= t_end)[-1][0]
+    i2_start = np.argwhere(time2_arr >= t_start)[0][0]
+    i2_end = np.argwhere(time2_arr <= t_end)[-1][0]
+    #
+    # Find the extreme values (max, min) of x1_arr and x2_arr
+    #
+    if alpha > 1.0e-6:
+        x1_sorted = sorted(x1_arr[i1_start: i1_end + 1])
+        x1_max = x1_sorted[len(x1_sorted) - int(alpha * len(x1_sorted))]
+        x1_min = x1_sorted[int(alpha * len(x1_sorted))]
+        x2_sorted = sorted(x2_arr[i2_start: i2_end + 1])
+        x2_max = x2_sorted[len(x2_sorted) - int(alpha * len(x2_sorted))]
+        x2_min = x2_sorted[int(alpha * len(x2_sorted))]
+    else:
+        x1_max = np.max(x1_arr[i1_start: i1_end + 1])
+        x1_min = np.min(x1_arr[i1_start: i1_end + 1])
+        x2_max = np.max(x2_arr[i1_start: i1_end + 1])
+        x2_min = np.min(x2_arr[i1_start: i1_end + 1])
+    #
+    # Calculate slope and intercept relating x1_arr to x2_arr.  That is, the values of
+    # m and b such that x1_arr = m * x2_arr + b
+    #
+    m = (x1_max - x1_min) / (x2_max - x2_min)
+    b = x1_max - m * x2_max
+    # return m and b
+    return [m, b]
+
+
+def calc_error_wvf(t1, x1, t2, x2):
+    """
+
+    :param t1:
+    :param x1:
+    :param t2:
+    :param x2:
+    :return:
+    """
+    # Interpolate the values of x2 at the t1 array.
+    x2_interp = interp_1d_array(t1, t2, x2, 'Akima')
+    #
+    # Calculate error e = x1 - x2_interp at each time point in the t1 array.
+    # Also calculate standard deviation of error.
+    #
+    err = x1 - x2_interp
+    err_rms = np.std(err, ddof=1)
+    # Return calculated standard deviation and error time series.
+    return [err_rms, err]
 
 
 def calc_seg_disp(time_arr, pos_arr, t_start, t_end, delta_t, disp_abs_val=True):
@@ -350,6 +444,45 @@ def calc_seg_disp(time_arr, pos_arr, t_start, t_end, delta_t, disp_abs_val=True)
         t_seg_start = t_seg_end
     # Return lists of segment indicies and segment displacements
     return [segments, seg_indices]
+
+
+def key_stats(key1, key2):
+    """
+    Calculate the following statistics for two keys consisting of bit strings
+        -- key length
+        -- entropy
+        -- count of mismatched bits
+        -- bit matching fraction
+
+    Args:
+        key1: String of bits, for example -- '100101100...'
+        key2: String of bits to be compared with key1
+
+    Returns: List consisting of
+        key_length: Number of bits in key1 and key2 that are compared.  If the lengths are not equal, only the first
+                n bits, where n = min(length(key1), length(key2)) are compared.
+        entropy_key1, entropy_key2 = Information entropy of each key, in units of bits
+        mismatch_count = number of bits mismatched between key1 and key2, in a position-by-position comparison
+        bit_match_fract = (key_length - mismatch_count)/key_length
+
+    """
+    nbits = min(len(key1), len(key2))
+    mismatch_count = 0
+    ones_count_key1 = 0
+    ones_count_key2 = 0
+    for bit in range(0, nbits):
+        if key1[bit] != key2[bit]:
+            mismatch_count += 1
+        if key1[bit] == '1':
+            ones_count_key1 += 1
+        if key2[bit] == '1':
+            ones_count_key2 += 1
+    entropy_key1 = entropy_calc(ones_count_key1, nbits)
+    entropy_key2 = entropy_calc(ones_count_key2, nbits)
+    bit_match_fract = (nbits - mismatch_count)/nbits
+    #
+    # Return values
+    return [nbits, entropy_key1, entropy_key2, mismatch_count, bit_match_fract]
 
 
 def main():

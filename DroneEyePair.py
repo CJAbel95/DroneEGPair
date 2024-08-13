@@ -1,12 +1,20 @@
 """
-    DroneEyePair -- Class that
+    DroneEyePair -- Class that generates key bit sequences from drone random flight path and eye-gaze path.
+                This is targeted for use with a DJI Mini 3 Pro drone.
 
-    Description ...
+    Description -- Python class that segments, quantizes, and generates key bit sequences for two time series:
+            DJI Mini 3 Pro drone flight path and a corresponding HoloLens eye-gaze path.
 
     by Christopher Abel
     Revision History
     ----------------
     07/29/2024 -- Original
+    08/05/2024 -- Initial version that generates keys, and calculates bit matching between drone and eye-gaze time
+                series, for a random-X pattern.
+    08/13/2024 -- Modified normalization of eye-gaze pattern to use calc_norm_factor2 function from EyeMatchUtils.
+                Plot drone - eye-gaze position error and calculate error standard deviation, and segment and segment
+                error standard deviations.  Added capability for constructor to invert eye-gaze hitpoint X values
+                to account for case of drone facing observer.
 """
 import csv
 import math
@@ -22,9 +30,15 @@ import HoloEGPath as Holo
 
 class DroneEyePair:
     # Default constructor
-    def __init__(self, drone_file, eg_file, eg_start, eg_end, tquant_start, tquant_end, tquant_step, nbits_per_seg=2, quant_abs_val=True, save_ext=False):
+    def __init__(self, drone_file, eg_file, eg_start, eg_end, tquant_start, tquant_end, tquant_step, eg_inv=False, rem_outliers=True, interp='Akima', lowpass=True, nbits_per_seg=2, quant_abs_val=True, save_ext=False):
         self.flight = DJId.DJIDronePath(drone_file)
-        self.eyegaze = Holo.HoloEGPath(eg_file, eg_start, eg_end, rem_outliers=True, interp='Akima', tstep=0.02, lowpass=True)
+        self.eyegaze = Holo.HoloEGPath(eg_file, eg_start, eg_end, rem_outliers=rem_outliers, interp=interp, tstep=0.02, lowpass=lowpass)
+        #
+        # If eg_inv = True, invert the x values of eye-gaze hitpoint.  This should be the case if the drone is
+        # facing towards the observer, rather than away from the observer, during the test.
+        #
+        if eg_inv:
+            self.eyegaze.hitpoint[:, 0] = -self.eyegaze.hitpoint[:, 0]
 
         # Find time indices at which to align drone and eye-gaze at start of drone calibration pattern
         alignment_indices = self.align_drone_eg(0.5, 10)
@@ -48,30 +62,21 @@ class DroneEyePair:
         #
         # Normalize drone and eye-gaze paths
         #
-        self.drone_pkpk = EGutil.calc_norm_factor(self.flight.t_interp, self.flight.x, 0, 10, alpha=0.0)
-        self.eg_pkpk = EGutil.calc_norm_factor(self.eyegaze.eg_time, self.eyegaze.hitpoint[:, 0], 0, 10, alpha=0.0)
-        self.dr_norm_x = EGutil.normalize_path(self.flight.x, self.drone_start_pos[0], self.drone_pkpk)
-        self.eg_norm_x = EGutil.normalize_path(self.eyegaze.hitpoint[:, 0], self.eg_xyz_start[0], self.eg_pkpk)
+        # self.drone_pkpk = EGutil.calc_norm_factor(self.flight.t_interp, self.flight.x, 0, 10, alpha=0.0)
+        # self.eg_pkpk = EGutil.calc_norm_factor(self.eyegaze.eg_time, self.eyegaze.hitpoint[:, 0], 0, 10, alpha=0.0)
+        # self.dr_norm_x = EGutil.normalize_path(self.flight.x, self.drone_start_pos[0], self.drone_pkpk)
+        # self.eg_norm_x = EGutil.normalize_path(self.eyegaze.hitpoint[:, 0], self.eg_xyz_start[0], self.eg_pkpk)
+        self.dr_norm_x = self.flight.x
+        m_norm, b_norm = EGutil.calc_norm_factor2(self.flight.t_interp, self.flight.x, self.eyegaze.eg_time, self.eyegaze.hitpoint[:, 0], 0, 160, alpha=0.02)
+        self.eg_norm_x = m_norm * self.eyegaze.hitpoint[:, 0] + b_norm
 
         #
-        # Segment and quantize drone and eye-gaze time series (x(t), y(t))
+        # Segment and quantize drone and eye-gaze time series (x(t), y(t)). Calculate standard dev. of drone segments
+        # and of segment error (drone_seg - eye-gaze_seg)
         #
         self.key_gen(nbits_per_seg, tquant_start, tquant_end, tquant_step, quant_abs_val)
-        # drone_segs, drone_seg_indices = EGutil.calc_seg_disp(self.flight.t_interp, self.dr_norm_x, tquant_start, tquant_end, tquant_step, quant_abs_val)
-        # eg_segs, eg_seg_indicies = EGutil.calc_seg_disp(self.eyegaze.eg_time + self.t_shift, self.eg_norm_x, tquant_start, tquant_end, tquant_step, quant_abs_val)
-        # self.drone_x_part = EGutil.partition_calc(drone_segs, nbits_per_seg)
-        # self.eg_x_part = EGutil.partition_calc(eg_segs, nbits_per_seg)
-        # code = [0, 1, 3, 2] # 2-bits, gray-coded
-        # drone_dx_q = np.digitize(drone_segs, self.drone_x_part)
-        # eg_dx_q = np.digitize(eg_segs, self.eg_x_part)
-        # self.key_drone = ''
-        # self.key_eg = ''
-        # for i in range(0, len(drone_dx_q)):
-        #     if nbits_per_seg == 1: self.key_drone += "{0:1b}".format(code[drone_dx_q[i] - 1])
-        #     else: self.key_drone += "{0:02b}".format(code[drone_dx_q[i] - 1])
-        # for i in range(0, len(eg_dx_q)):
-        #     if nbits_per_seg == 1: self.key_eg += "{0:1b}".format(code[eg_dx_q[i] - 1])
-        #     else: self.key_eg += "{0:02b}".format(code[eg_dx_q[i] - 1])
+        self.drone_seg_stdev = np.std(np.array(self.drone_segs, np.float64), ddof=1)
+        self.seg_err_stdev = np.std(np.array(self.drone_segs, np.float64) - np.array(self.eg_segs, np.float64), ddof=1)
 
         #
         # Write selected outputs to .csv files for convenient analysis in other tools.
@@ -159,6 +164,7 @@ class DroneEyePair:
                                                              tquant_end, tquant_step, quant_abs_val)
         self.eg_segs, self.eg_seg_indicies = EGutil.calc_seg_disp(self.eyegaze.eg_time + self.t_shift, self.eg_norm_x,
                                                         tquant_start, tquant_end, tquant_step, quant_abs_val)
+
         #
         # Choose optimum partition thresholds for nbits_per_seg bits of quantization per segement.
         #
@@ -210,21 +216,32 @@ class DroneEyePair:
 
 def main ():
     eg_filepath = ('C:\\Users\\abelc\\OneDrive\\Cleveland State\\Thesis Research'
-                    '\\Data Sets\\DJI Drone\\DroneTracker3\\072324\\')
+                    '\\Data Sets\\DJI Drone\\DroneTracker3\\')
     drone_filepath = ('C:\\Users\\abelc\\OneDrive\\Cleveland State\\Thesis Research\\Data Sets'
-                '\\DJI Drone\\Drone Flight Path\\072324\\')
+                '\\DJI Drone\\Drone Flight Path\\')
+    test_date = '081124\\'
     # eg_filename, drone_filename, eg_start = ['eye_tracker_07232024_192335.csv', 'randx_patt_07232024_192433.csv', 3.0]
-    eg_filename, drone_filename, eg_start = ['eye_tracker_07232024_192522.csv', 'randx_patt_07232024_192616.csv', 2.0]
+    # eg_filename, drone_filename, eg_start = ['eye_tracker_07232024_192522.csv', 'randx_patt_07232024_192616.csv', 2.0]
     # eg_filename, drone_filename, eg_start = ['eye_tracker_07232024_192707.csv', 'randx_patt_07232024_192757.csv', 0.75]
+    # eg_filename, drone_filename, eg_start = ['eye_tracker_08062024_134813.csv', 'randx_patt_08062024_134824.csv', 3.4]
+    # eg_filename, drone_filename, eg_start = ['eye_tracker_08062024_134429.csv', 'randx_patt_08062024_134437.csv', 2.0]
+    eg_filename, drone_filename, eg_start, eg_inv = ['eye_tracker_08112024_201319.csv',
+                                                     'randx_patt_08112024_201350.csv', 1.0, True]
+    # eg_filename, drone_filename, eg_start, eg_inv = ['eye_tracker_08122024_200239.csv', 'randx_patt_08122024_200320.csv', 0.0, False]
 
-    print(f'Drone flight time series: {drone_filepath + drone_filename}')
-    print(f'Eye-gaze time series: {eg_filepath + eg_filename}')
-    eg_end = 45.0
+    print(f'Drone flight time series: {drone_filepath + test_date + drone_filename}')
+    print(f'Eye-gaze time series: {eg_filepath + test_date + eg_filename}')
+    eg_end = 165.0
     tquant_start = 12.0
-    tquant_end = 35.0
+    tquant_end = 160.0
     tquant_step = 1.0
+    rem_outliers = True
+    interp = 'Akima'
+    lowpass = True
     quant_abs_val = False
-    pair_test = DroneEyePair(drone_filepath + drone_filename, eg_filepath + eg_filename, eg_start, eg_end, tquant_start, tquant_end, tquant_step, quant_abs_val=quant_abs_val, save_ext=True)
+    pair_test = DroneEyePair(drone_filepath + test_date + drone_filename, eg_filepath + test_date + eg_filename, eg_start,
+                             eg_end, tquant_start, tquant_end, tquant_step, eg_inv=eg_inv, rem_outliers=rem_outliers,
+                             interp=interp, lowpass=lowpass, quant_abs_val=quant_abs_val, save_ext=True)
     print(f'\tDrone Z axis rotated {180 / math.pi * pair_test.flight.theta:.4f} degrees relative to North.')
     print(f'\tTime shift = {pair_test.t_shift:.4f} s')
     print(f'\tKey from Drone Flight = {pair_test.key_drone}')
@@ -241,6 +258,22 @@ def main ():
     print(f'\tEntropy(Eye-gaze key) = {EGutil.entropy_calc(ones_eg, len(pair_test.key_eg))} bits')
 
     #
+    # Calculate position error (drone(t) - eye-gaze-hitpoint(t)) vs. time
+    #
+    pos_err_stdev, pos_err = EGutil.calc_error_wvf(pair_test.flight.t_interp, pair_test.dr_norm_x,
+                                                   pair_test.eyegaze.eg_time + pair_test.t_shift, pair_test.eg_norm_x)
+    print('\tStd dev of position error = {0:.4f}'.format(pos_err_stdev))
+    #
+    # Print drone and eye-gaze quantization thresholds and standard deviation of segment error
+    #
+    print('\n\tDrone quantization thresholds    {0:.4f}, {1:.4f}, {2:.4f}'.format(pair_test.drone_x_part[0],
+                                                                pair_test.drone_x_part[1], pair_test.drone_x_part[2]))
+    print('\tEye-Gaze quantization thresholds {0:.4f}, {1:.4f}, {2:.4f}'.format(pair_test.eg_x_part[0],
+                                                                pair_test.eg_x_part[1], pair_test.eg_x_part[2]))
+    print('\tStd dev of drone X segments = {0:.5f}'.format(pair_test.drone_seg_stdev))
+    print('\tStd dev of (drone - eye-gaze) X segment error = {0:.5f}'.format(pair_test.seg_err_stdev))
+
+    #
     # Plot raw values of drone X and eye-gaze X vs. time without any time shift
     #
     plot_start = 0
@@ -248,13 +281,13 @@ def main ():
     param_dict = {'title': 'Drone X vs. Time', 'xlabel': 'drone_time (s)', 'ylabel': 'X (m)',
                   'legends': ['Drone X']}
     EGplt.plot_multiline(axes1a, [pair_test.flight.x], [pair_test.flight.t_interp], param_dict)
-    axes1a.set_xlim(0, 40.0)
+    axes1a.set_xlim(0, tquant_end)
     axes1a.grid(visible=True, which='both', axis='both')
     param_dict = {'title': 'Eye-Gaze X vs. Time', 'xlabel': 'eg_time (s)', 'ylabel': 'X (m)',
                   'legends': ['Eye-Gaze X']}
     EGplt.plot_multiline(axes1b, [pair_test.eyegaze.hitpoint[plot_start:, 0]],
                          [pair_test.eyegaze.eg_time[plot_start:]], param_dict)
-    axes1b.set_xlim(0.0, 40.0)
+    axes1b.set_xlim(0.0, tquant_end)
     axes1b.grid(visible=True, which='both', axis='both')
 
     #
@@ -266,8 +299,24 @@ def main ():
     param_dict = {'title': 'Eye-Gaze and Drone X vs. Time', 'xlabel': 'Time (s)', 'ylabel': 'X (m)',
                   'legends': ['Eye-Gaze X', 'Drone X']}
     EGplt.plot_multiline(axes2, [pair_test.eg_norm_x[egplt_start:], pair_test.dr_norm_x[drplt_start:]],
-                         [pair_test.eyegaze.eg_time[egplt_start:] + pair_test.t_shift, pair_test.flight.t_interp[drplt_start:]], param_dict)
+                         [pair_test.eyegaze.eg_time[egplt_start:] + pair_test.t_shift,
+                         pair_test.flight.t_interp[drplt_start:]], param_dict)
+    # EGplt.plot_multiline(axes2, [pair_test.eg_norm_x[egplt_start:], pair_test.dr_norm_x[drplt_start:],
+    #                     pos_err[drplt_start:]],[pair_test.eyegaze.eg_time[egplt_start:] + pair_test.t_shift,
+    #                     pair_test.flight.t_interp[drplt_start:], pair_test.flight.t_interp[drplt_start:]],
+    #                     param_dict)
     axes2.grid(visible=True, which='both', axis='both')
+    axes2.set_xlim(0, tquant_end)
+
+    #
+    # Plot position error (drone(t) - eye-gaze-hitpoint(t)) vs. time
+    #
+    fig3, axes3 = plt.subplots()
+    param_dict = {'title': 'Drone - Eye-Gaze X Position Error', 'xlabel': 'Time (s)', 'ylabel': 'Error (m)',
+                  'legends': ['Drone - Eye-Gaze']}
+    EGplt.plot_multiline(axes3, [pos_err[drplt_start:]],[pair_test.flight.t_interp[drplt_start:]], param_dict)
+    axes3.grid(visible=True, which='both', axis='both')
+    axes3.set_xlim(0, tquant_end)
 
     plt.show()
 

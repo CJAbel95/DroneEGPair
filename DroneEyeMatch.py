@@ -1,6 +1,7 @@
 #
 # DroneEyeMatch.py -- Class containing fields and methods for data from
-#           drone flight and eye-gaze capture files.
+#           drone flight and eye-gaze capture files. This class is intended for use with
+#           the CoDrone EDU drone.
 #
 # Description -- Class that contains data from:
 #       -- Drone flight log .csv file
@@ -535,7 +536,7 @@ class DroneEyeMatch:
 
 def main():
     eg_file_path = ('C:\\Users\\abelc\\OneDrive\\Cleveland State\\Thesis Research\\Data Sets\\CoDrone\\'
-                    'DroneTracker3\\')
+                    'DroneTracker3\\April 8 2024\\')
     # eg_file_name = 'eye_tracker_03242024_121300.csv'
     # eg_file_name = 'eye_tracker_03242024_122057.csv'
     # eg_file_name = 'eye_tracker_03242024_122440.csv'
@@ -547,7 +548,7 @@ def main():
     # eg_chop_start = 0.0
     eg_chop_end = 59.0
     drone_file_path = ('C:\\Users\\abelc\\OneDrive\\Cleveland State\\Thesis Research\\Data Sets\\CoDrone\\'
-                       'Drone Flight Path\\')
+                       'Drone Flight Path\\April 8 2024\\')
     # drone_file_name = 'drone_path03242024_121322.csv'
     # drone_file_name = 'drone_path03242024_122102.csv'
     # drone_file_name = 'drone_path03242024_122449.csv'

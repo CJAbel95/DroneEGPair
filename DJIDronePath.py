@@ -198,17 +198,39 @@ def rem_duplicates(time_series):
 
 def main():
     filepath = ('C:\\Users\\abelc\\OneDrive\\Cleveland State\\Thesis Research\\Data Sets'
-                '\\DJI Drone\\Drone Flight Path\\072324\\')
-    filename = 'randx_patt_07232024_192433.csv'
-    print(f'Drone flight path file: {filepath}{filename}')
+                '\\DJI Drone\\Drone Flight Path\\')
+    filepth_date = '081224\\'
+    # filename = 'randx_patt_08062024_134101.csv'
+    # filename = 'randx_patt_08062024_134437.csv'
+    # filename = 'randx_patt_08062024_134824.csv'
+    # filename = 'randx_patt_08112024_080146.csv'
+    # filename = 'randx_patt_08112024_080534.csv'
+    # filename = 'randx_patt_08112024_080940.csv'
+    # filename = 'randx_patt_08112024_081308.csv'
+    # filename = 'randx_patt_08112024_200332.csv'
+    # filename = 'randx_patt_08112024_200658.csv'
+    # filename = 'randx_patt_08112024_201030.csv'
+    # filename = 'randx_patt_08112024_201030.csv'
+    # filename = 'randx_patt_08112024_201350.csv'
+    # filename = 'randx_patt_08122024_092701.csv'
+    # filename = 'randx_patt_08122024_093101.csv'
+    # filename = 'randx_patt_08122024_093433.csv'
+    # filename = 'randx_patt_08122024_093802.csv'
+    filename = 'randx_patt_08122024_195240.csv'
+    # filename = 'randx_patt_08122024_195610.csv'
+    # filename = 'randx_patt_08122024_195946.csv'
+    # filename = 'randx_patt_08122024_200320.csv'
+    print(f'Drone flight path file: {filepath}{filepth_date}{filename}')
 
-    flight1 = DJIDronePath(filepath + filename, 'Akima', 0.2, lowpass=False)
+    flight1 = DJIDronePath(filepath + filepth_date + filename, 'Akima', 0.2, lowpass=False)
+    print(f'\tDrone Z axis rotated {180 / math.pi * flight1.theta:.4f} degrees relative to North.')
+
 
     #
     # Read in data file separately in order to plot latitude and longitude vs. time
     #
     [start_time, takeoff_lat, takeoff_long, sidx, snum,
-     timee, timed, alt, latit, longit] = read_dji_file(filepath + filename)
+     timee, timed, alt, latit, longit] = read_dji_file(filepath + filepth_date + filename)
     [sidxr, snumr, timeer, altr, latitr, longitr] = rem_duplicates([sidx, snum, timee, alt, latit, longit])
     fig0, (axes0a, axes0b) = plt.subplots(2, 1)
     param_dict = {'title': 'Latitude vs. Time', 'xlabel': 't (s)', 'ylabel': 'Delta(Latitude) (m)', 'legends': ['Latitude']}

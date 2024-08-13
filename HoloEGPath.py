@@ -112,12 +112,41 @@ def read_eg_file(eg_file, chop_start=0.0, chop_end=1000.0):
 
 
 def main():
+    # eg_file_path = ('C:\\Users\\abelc\\OneDrive\\Cleveland State\\Thesis Research'
+    #                 '\\Data Sets\\DJI Drone\\DroneTracker3\\080624\\')
     eg_file_path = ('C:\\Users\\abelc\\OneDrive\\Cleveland State\\Thesis Research'
-                    '\\Data Sets\\DJI Drone\\DroneTracker3\\072324\\')
-    eg_file_name = 'eye_tracker_07232024_192335.csv'
-    eg_start = 3.0
-    eg_end = 59.0
-    eg_test1 = HoloEGPath(eg_file_path + eg_file_name, eg_start, eg_end)
+                    '\\Data Sets\\DJI Drone\\DroneTracker3\\')
+    filepth_date = '081124\\'
+    # eg_file_name = 'eye_tracker_07232024_192335.csv'
+    # eg_file_name = 'eye_tracker_08062024_133856.csv'
+    # eg_file_name = 'eye_tracker_08062024_134429.csv'
+    # eg_file_name = 'eye_tracker_08062024_134813.csv'
+    # eg_file_name = 'eye_tracker_08102024_105325.csv'
+    # eg_file_name = 'eye_tracker_08102024_105711.csv'
+    # eg_file_name = 'eye_tracker_08102024_110205.csv'
+    # eg_file_name = 'eye_tracker_08112024_075955.csv'
+    # eg_file_name = 'eye_tracker_08112024_080435.csv'
+    # eg_file_name = 'eye_tracker_08112024_080826.csv'
+    # eg_file_name = 'eye_tracker_08112024_081230.csv'
+    # eg_file_name = 'eye_tracker_08112024_200116.csv'
+    # eg_file_name = 'eye_tracker_08112024_200316.csv'
+    # eg_file_name = 'eye_tracker_08112024_200623.csv'
+    # eg_file_name = 'eye_tracker_08112024_200946.csv'
+    eg_file_name = 'eye_tracker_08112024_201319.csv'
+    # eg_file_name = 'eye_tracker_08122024_092630.csv'
+    # eg_file_name = 'eye_tracker_08122024_092948.csv'
+    # eg_file_name = 'eye_tracker_08122024_093349.csv'
+    # eg_file_name = 'eye_tracker_08122024_093720.csv'
+    # eg_file_name = 'eye_tracker_08122024_195210.csv'
+    # eg_file_name = 'eye_tracker_08122024_195528.csv'
+    # eg_file_name = 'eye_tracker_08122024_195859.csv'
+    # eg_file_name = 'eye_tracker_08122024_200239.csv'
+    eg_start = 0.0
+    eg_end = 250.0
+    rem_outliers = False
+    interp = 'None'
+    lowpass = False
+    eg_test1 = HoloEGPath(eg_file_path + filepth_date + eg_file_name, eg_start, eg_end, rem_outliers=rem_outliers, interp=interp, lowpass=lowpass)
 
     # Figure 1 -- Eye-Gaze Hitpoint X and Y vs. Time
     plot_start = 0
