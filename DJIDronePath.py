@@ -9,6 +9,7 @@
     Revision History
     ----------------
     07/23/2024 -- Original
+    08/13/2024 -- Store dist_tako (distance from takeoff to pattern start) and speedlev as attributes.
 
 """
 import csv
@@ -32,7 +33,7 @@ class DJIDronePath:
         # Read raw data from drone file
         #
         [self.start_time, self.takeoff_lat, self.takeoff_long, sidx, snum,
-                timee, timed, alt, latit, longit] = read_dji_file(self.drone_file)
+                timee, timed, alt, latit, longit, self.dist_tako, self.speedlev] = read_dji_file(self.drone_file)
         #
         # Remove samples with duplicate positions
         [sidxr, snumr, timeer, altr, latitr, longitr] = rem_duplicates([sidx, snum, timee, alt, latit, longit])
@@ -115,9 +116,11 @@ def read_dji_file(filename):
         start_time = datetime.strptime(start_pos[2], ' %m/%d/%Y %H:%M:%S')
         start_lat = float(start_pos[6])
         start_long = float(start_pos[8])
+        speedlevel = float(start_pos[10])
         start_height = float(start_pos[4])
         lat_shift = 111111.0 * (start_lat - takeoff_lat)
         long_shift = 111111.0 * (start_long - takeoff_long)
+        dist_from_takeoff = np.sqrt(lat_shift ** 2 + long_shift ** 2)
         #
         # Read each additional line, capturing sample index, elapsed time, elapsed time
         # from Date object, altitude, latitude, longitude, and segment index in lists.
@@ -160,7 +163,7 @@ def read_dji_file(filename):
         # Return list of [start_time, takeoff_lat, takeoff_long, samp_index, segment_num, time_elapsed,
         #   time_dateobj, altitude, delta_lat, delta_long]
         return [start_time, takeoff_lat, takeoff_long, samp_index, segment_num, time_elapsed,
-                time_dateobj, altitude, delta_lat, delta_long]
+                time_dateobj, altitude, delta_lat, delta_long, dist_from_takeoff, speedlevel]
 
 
 def rem_duplicates(time_series):
@@ -199,10 +202,11 @@ def rem_duplicates(time_series):
 def main():
     filepath = ('C:\\Users\\abelc\\OneDrive\\Cleveland State\\Thesis Research\\Data Sets'
                 '\\DJI Drone\\Drone Flight Path\\')
-    filepth_date = '081224\\'
+    filepth_date = '082624\\'
     # filename = 'randx_patt_08062024_134101.csv'
     # filename = 'randx_patt_08062024_134437.csv'
     # filename = 'randx_patt_08062024_134824.csv'
+    # filename = 'randx_patt_08102024_110242.csv'
     # filename = 'randx_patt_08112024_080146.csv'
     # filename = 'randx_patt_08112024_080534.csv'
     # filename = 'randx_patt_08112024_080940.csv'
@@ -216,38 +220,52 @@ def main():
     # filename = 'randx_patt_08122024_093101.csv'
     # filename = 'randx_patt_08122024_093433.csv'
     # filename = 'randx_patt_08122024_093802.csv'
-    filename = 'randx_patt_08122024_195240.csv'
+    # filename = 'randx_patt_08122024_195240.csv'
     # filename = 'randx_patt_08122024_195610.csv'
     # filename = 'randx_patt_08122024_195946.csv'
     # filename = 'randx_patt_08122024_200320.csv'
+    # filename = 'randxy_patt_08242024_134014.csv'
+    # filename = 'randxy_patt_08242024_193420.csv'
+    filename = 'randxy_patt_08262024_071019.csv'
     print(f'Drone flight path file: {filepath}{filepth_date}{filename}')
 
     flight1 = DJIDronePath(filepath + filepth_date + filename, 'Akima', 0.2, lowpass=False)
     print(f'\tDrone Z axis rotated {180 / math.pi * flight1.theta:.4f} degrees relative to North.')
+    print(f'\tDrone height = {flight1.y[0]:.2f} m\tDistance from Takeoff = {flight1.dist_tako:.3f} m'
+          f'\tSpeedlev = {flight1.speedlev:.2f}')
 
 
     #
     # Read in data file separately in order to plot latitude and longitude vs. time
     #
     [start_time, takeoff_lat, takeoff_long, sidx, snum,
-     timee, timed, alt, latit, longit] = read_dji_file(filepath + filepth_date + filename)
+     timee, timed, alt, latit, longit, dist_tako, speedlev] = read_dji_file(filepath + filepth_date + filename)
     [sidxr, snumr, timeer, altr, latitr, longitr] = rem_duplicates([sidx, snum, timee, alt, latit, longit])
-    fig0, (axes0a, axes0b) = plt.subplots(2, 1)
+    fig0, (axes0a, axes0b, axes0c) = plt.subplots(3, 1)
     param_dict = {'title': 'Latitude vs. Time', 'xlabel': 't (s)', 'ylabel': 'Delta(Latitude) (m)', 'legends': ['Latitude']}
     EGplt.plot_multiline(axes0a, [latitr], [timeer], param_dict)
     axes0a.grid(visible=True, which='both', axis='both')
     param_dict = {'title': 'Longitude vs. Time', 'xlabel': 't (s)', 'ylabel': 'Delta(Longitude) (m)', 'legends': ['Longitude']}
     EGplt.plot_multiline(axes0b, [longitr], [timeer], param_dict)
     axes0b.grid(visible=True, which='both', axis='both')
+    param_dict = {'title': 'Altitude vs. Time', 'xlabel': 't (s)', 'ylabel': 'Altitude (m)', 'legends': ['Altitude']}
+    EGplt.plot_multiline(axes0c, [altr], [timeer], param_dict)
+    axes0c.grid(visible=True, which='both', axis='both')
+
 
     #
-    # Plot X, Y vs. time
+    # Plot X, Y, Z vs. time
     #
     fig1, axes1 = plt.subplots()
     param_dict = {'title': 'X and Z vs. Time', 'xlabel': 't (s)', 'ylabel': 'X (m), Z (m)', 'legends': ['X', 'Z']}
     EGplt.plot_multiline(axes1, [flight1.x, flight1.z],
                          [flight1.t_interp, flight1.t_interp], param_dict)
     axes1.grid(visible=True, which='both', axis='both')
+
+    fig2, axes2 = plt.subplots()
+    param_dict = {'title': 'Y vs. Time', 'xlabel': 't (s)', 'ylabel': 'Y (m)', 'legends': ['Y']}
+    EGplt.plot_multiline(axes2, [flight1.y],[flight1.t_interp], param_dict)
+    axes2.grid(visible=True, which='both', axis='both')
 
     plt.show()
 

@@ -71,6 +71,12 @@ class DroneEyePair:
         self.eg_norm_x = m_norm * self.eyegaze.hitpoint[:, 0] + b_norm
 
         #
+        # Calculate position error (drone(t) - eye-gaze-hitpoint(t)) vs. time
+        #
+        self.pos_err_stdev, self.pos_err = EGutil.calc_error_wvf(self.flight.t_interp, self.dr_norm_x,
+                                                       self.eyegaze.eg_time + self.t_shift, self.eg_norm_x)
+
+        #
         # Segment and quantize drone and eye-gaze time series (x(t), y(t)). Calculate standard dev. of drone segments
         # and of segment error (drone_seg - eye-gaze_seg)
         #
@@ -219,21 +225,38 @@ def main ():
                     '\\Data Sets\\DJI Drone\\DroneTracker3\\')
     drone_filepath = ('C:\\Users\\abelc\\OneDrive\\Cleveland State\\Thesis Research\\Data Sets'
                 '\\DJI Drone\\Drone Flight Path\\')
-    test_date = '081124\\'
+    test_date = '081224\\'
     # eg_filename, drone_filename, eg_start = ['eye_tracker_07232024_192335.csv', 'randx_patt_07232024_192433.csv', 3.0]
     # eg_filename, drone_filename, eg_start = ['eye_tracker_07232024_192522.csv', 'randx_patt_07232024_192616.csv', 2.0]
     # eg_filename, drone_filename, eg_start = ['eye_tracker_07232024_192707.csv', 'randx_patt_07232024_192757.csv', 0.75]
     # eg_filename, drone_filename, eg_start = ['eye_tracker_08062024_134813.csv', 'randx_patt_08062024_134824.csv', 3.4]
     # eg_filename, drone_filename, eg_start = ['eye_tracker_08062024_134429.csv', 'randx_patt_08062024_134437.csv', 2.0]
-    eg_filename, drone_filename, eg_start, eg_inv = ['eye_tracker_08112024_201319.csv',
-                                                     'randx_patt_08112024_201350.csv', 1.0, True]
-    # eg_filename, drone_filename, eg_start, eg_inv = ['eye_tracker_08122024_200239.csv', 'randx_patt_08122024_200320.csv', 0.0, False]
+    # eg_filename, drone_filename, eg_start, eg_inv = ['eye_tracker_08102024_110205.csv',
+    #                                                   'randx_patt_08102024_110242.csv', 2.5, False]
+    # eg_filename, drone_filename, eg_start, eg_inv = ['eye_tracker_08112024_075955.csv',
+    #                                                  'randx_patt_08112024_080146.csv', 0.5, False]
+    # eg_filename, drone_filename, eg_start, eg_inv = ['eye_tracker_08112024_075955.csv',
+    #                                                  'randx_patt_08112024_080146.csv', 0.5, False]
+    # eg_filename, drone_filename, eg_start, eg_inv = ['eye_tracker_08112024_080435.csv',
+    #                                                  'randx_patt_08112024_080534.csv', 2.0, False]
+    # eg_filename, drone_filename, eg_start, eg_inv = ['eye_tracker_08112024_080826.csv',
+    #                                                  'randx_patt_08112024_080940.csv', 6.0, True]
+    # eg_filename, drone_filename, eg_start, eg_inv = ['eye_tracker_08112024_081230.csv',
+    #                                                  'randx_patt_08112024_081308.csv', 0.0, True]
+    # eg_filename, drone_filename, eg_start, eg_inv = ['eye_tracker_08112024_201319.csv',
+    #                                                  'randx_patt_08112024_201350.csv', 1.0, True]
+    # eg_filename, drone_filename, eg_start, eg_inv = ['eye_tracker_08122024_092630.csv',
+    #                                                  'randx_patt_08122024_092701.csv', 3.0, False]
+    # eg_filename, drone_filename, eg_start, eg_inv = ['eye_tracker_08122024_092948.csv',
+    #                                                  'randx_patt_08122024_093101.csv', 2.0, True]
+    eg_filename, drone_filename, eg_start, eg_inv = ['eye_tracker_08122024_200239.csv',
+                                                     'randx_patt_08122024_200320.csv', 0.0, False]
 
     print(f'Drone flight time series: {drone_filepath + test_date + drone_filename}')
     print(f'Eye-gaze time series: {eg_filepath + test_date + eg_filename}')
     eg_end = 165.0
     tquant_start = 12.0
-    tquant_end = 160.0
+    tquant_end = 155.0
     tquant_step = 1.0
     rem_outliers = True
     interp = 'Akima'
@@ -242,6 +265,9 @@ def main ():
     pair_test = DroneEyePair(drone_filepath + test_date + drone_filename, eg_filepath + test_date + eg_filename, eg_start,
                              eg_end, tquant_start, tquant_end, tquant_step, eg_inv=eg_inv, rem_outliers=rem_outliers,
                              interp=interp, lowpass=lowpass, quant_abs_val=quant_abs_val, save_ext=True)
+    print(f'\tDrone approx. {pair_test.flight.dist_tako:.2f} m from observer')
+    print(f'\tInitial drone height = {pair_test.flight.y[0]:.2f} m')
+    print(f'\tDrone speed level = {pair_test.flight.speedlev:.2f}')
     print(f'\tDrone Z axis rotated {180 / math.pi * pair_test.flight.theta:.4f} degrees relative to North.')
     print(f'\tTime shift = {pair_test.t_shift:.4f} s')
     print(f'\tKey from Drone Flight = {pair_test.key_drone}')
@@ -260,9 +286,7 @@ def main ():
     #
     # Calculate position error (drone(t) - eye-gaze-hitpoint(t)) vs. time
     #
-    pos_err_stdev, pos_err = EGutil.calc_error_wvf(pair_test.flight.t_interp, pair_test.dr_norm_x,
-                                                   pair_test.eyegaze.eg_time + pair_test.t_shift, pair_test.eg_norm_x)
-    print('\tStd dev of position error = {0:.4f}'.format(pos_err_stdev))
+    print('\tStd dev of position error = {0:.4f}'.format(pair_test.pos_err_stdev))
     #
     # Print drone and eye-gaze quantization thresholds and standard deviation of segment error
     #
@@ -314,7 +338,8 @@ def main ():
     fig3, axes3 = plt.subplots()
     param_dict = {'title': 'Drone - Eye-Gaze X Position Error', 'xlabel': 'Time (s)', 'ylabel': 'Error (m)',
                   'legends': ['Drone - Eye-Gaze']}
-    EGplt.plot_multiline(axes3, [pos_err[drplt_start:]],[pair_test.flight.t_interp[drplt_start:]], param_dict)
+    EGplt.plot_multiline(axes3, [pair_test.pos_err[drplt_start:]],
+                         [pair_test.flight.t_interp[drplt_start:]], param_dict)
     axes3.grid(visible=True, which='both', axis='both')
     axes3.set_xlim(0, tquant_end)
 

@@ -116,7 +116,7 @@ def main():
     #                 '\\Data Sets\\DJI Drone\\DroneTracker3\\080624\\')
     eg_file_path = ('C:\\Users\\abelc\\OneDrive\\Cleveland State\\Thesis Research'
                     '\\Data Sets\\DJI Drone\\DroneTracker3\\')
-    filepth_date = '081124\\'
+    filepth_date = '082624\\'
     # eg_file_name = 'eye_tracker_07232024_192335.csv'
     # eg_file_name = 'eye_tracker_08062024_133856.csv'
     # eg_file_name = 'eye_tracker_08062024_134429.csv'
@@ -124,15 +124,15 @@ def main():
     # eg_file_name = 'eye_tracker_08102024_105325.csv'
     # eg_file_name = 'eye_tracker_08102024_105711.csv'
     # eg_file_name = 'eye_tracker_08102024_110205.csv'
+    # eg_file_name = 'eye_tracker_08102024_110533.csv'
     # eg_file_name = 'eye_tracker_08112024_075955.csv'
     # eg_file_name = 'eye_tracker_08112024_080435.csv'
     # eg_file_name = 'eye_tracker_08112024_080826.csv'
     # eg_file_name = 'eye_tracker_08112024_081230.csv'
-    # eg_file_name = 'eye_tracker_08112024_200116.csv'
     # eg_file_name = 'eye_tracker_08112024_200316.csv'
     # eg_file_name = 'eye_tracker_08112024_200623.csv'
     # eg_file_name = 'eye_tracker_08112024_200946.csv'
-    eg_file_name = 'eye_tracker_08112024_201319.csv'
+    # eg_file_name = 'eye_tracker_08112024_201319.csv'
     # eg_file_name = 'eye_tracker_08122024_092630.csv'
     # eg_file_name = 'eye_tracker_08122024_092948.csv'
     # eg_file_name = 'eye_tracker_08122024_093349.csv'
@@ -141,8 +141,12 @@ def main():
     # eg_file_name = 'eye_tracker_08122024_195528.csv'
     # eg_file_name = 'eye_tracker_08122024_195859.csv'
     # eg_file_name = 'eye_tracker_08122024_200239.csv'
-    eg_start = 0.0
-    eg_end = 250.0
+    # eg_file_name = 'eye_tracker_08242024_193358.csv'
+    # eg_file_name = 'eye_tracker_08242024_193517.csv'
+    # eg_file_name = 'eye_tracker_08242024_193625.csv'
+    eg_file_name = 'eye_tracker_08262024_070838.csv'
+    eg_start = 7.0
+    eg_end = 160.0
     rem_outliers = False
     interp = 'None'
     lowpass = False
