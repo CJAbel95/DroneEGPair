@@ -144,8 +144,9 @@ def main():
     # eg_file_name = 'eye_tracker_08242024_193358.csv'
     # eg_file_name = 'eye_tracker_08242024_193517.csv'
     # eg_file_name = 'eye_tracker_08242024_193625.csv'
-    eg_file_name = 'eye_tracker_08262024_070838.csv'
-    eg_start = 7.0
+    # eg_file_name = 'eye_tracker_08262024_070838.csv'
+    eg_file_name = 'eye_tracker_08262024_150602.csv'
+    eg_start = 0.0
     eg_end = 160.0
     rem_outliers = False
     interp = 'None'

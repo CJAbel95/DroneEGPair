@@ -226,7 +226,8 @@ def main():
     # filename = 'randx_patt_08122024_200320.csv'
     # filename = 'randxy_patt_08242024_134014.csv'
     # filename = 'randxy_patt_08242024_193420.csv'
-    filename = 'randxy_patt_08262024_071019.csv'
+    # filename = 'randxy_patt_08262024_071019.csv'
+    filename = 'randxy_patt_08262024_150642.csv'
     print(f'Drone flight path file: {filepath}{filepth_date}{filename}')
 
     flight1 = DJIDronePath(filepath + filepth_date + filename, 'Akima', 0.2, lowpass=False)
